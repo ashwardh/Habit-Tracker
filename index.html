@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Habit Tracker Bot</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f0f11;
+    --surface: #18181c;
+    --surface2: #212127;
+    --border: #2a2a33;
+    --accent: #6ee7b7;
+    --accent2: #3b82f6;
+    --text: #f0f0f4;
+    --muted: #8888a0;
+    --danger: #f87171;
+    --success: #6ee7b7;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  #app {
+    width: 100%;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+    min-height: 600px;
+  }
+
+  /* Header */
+  #header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+  }
+  #avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6ee7b7 0%, #3b82f6 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  #header-info { flex: 1; }
+  #bot-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  #bot-status { font-size: 12px; color: var(--accent); display: flex; align-items: center; gap: 5px; }
+  #status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  #progress-wrap { margin-left: auto; text-align: right; }
+  #progress-label { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  #progress-bar-track { width: 100px; height: 3px; background: var(--border); border-radius: 3px; margin-top: 5px; }
+  #progress-bar-fill { height: 3px; background: linear-gradient(90deg, #6ee7b7, #3b82f6); border-radius: 3px; transition: width 0.4s ease; }
+
+  /* Chat area */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 380px;
+    max-height: 440px;
+    scroll-behavior: smooth;
+  }
+  #messages::-webkit-scrollbar { width: 4px; }
+  #messages::-webkit-scrollbar-track { background: transparent; }
+  #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .msg { display: flex; flex-direction: column; gap: 4px; animation: fadeUp 0.25s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  .msg.bot { align-items: flex-start; }
+  .msg.user { align-items: flex-end; }
+
+  .bubble {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 85%;
+  }
+  .msg.bot .bubble {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+    color: var(--text);
+  }
+  .msg.user .bubble {
+    background: linear-gradient(135deg, #1d4ed8, #2563eb);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg-meta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+  /* Quick option chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 6px; }
+  .chip {
+    font-size: 12.5px;
+    padding: 6px 13px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(110,231,183,0.06); }
+  .chip.selected { border-color: var(--accent); color: var(--accent); background: rgba(110,231,183,0.1); }
+
+  /* Typing indicator */
+  #typing {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+  }
+  .tdot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--muted);
+    animation: tdot 1.2s infinite;
+  }
+  .tdot:nth-child(2){animation-delay:.2s}
+  .tdot:nth-child(3){animation-delay:.4s}
+  @keyframes tdot{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+  /* Input area */
+  #input-area {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    background: var(--surface);
+  }
+  #user-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 11px 14px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    resize: none;
+    min-height: 42px;
+    max-height: 110px;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.5;
+  }
+  #user-input::placeholder { color: var(--muted); }
+  #user-input:focus { border-color: var(--accent2); }
+  #send-btn {
+    width: 42px; height: 42px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, #059669, #3b82f6);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  #send-btn:hover { opacity: 0.85; }
+  #send-btn:active { transform: scale(0.95); }
+  #send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  #send-btn svg { width: 18px; height: 18px; fill: white; }
+
+  /* Summary card */
+  #summary-card {
+    display: none;
+    margin: 0 24px 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  #summary-card h3 { font-size: 14px; font-weight: 600; color: var(--accent); margin-bottom: 14px; }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .summary-item { background: var(--bg); border-radius: var(--radius-sm); padding: 10px 13px; }
+  .summary-item .s-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-family: 'DM Mono', monospace; }
+  .summary-item .s-val { font-size: 13px; color: var(--text); margin-top: 3px; font-weight: 500; }
+  #sync-btn {
+    margin-top: 14px; width: 100%;
+    padding: 11px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, #059669, #3b82f6);
+    border: none; color: white;
+    font-size: 14px; font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  #sync-btn:hover { opacity: 0.85; }
+  #sync-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #sync-status { font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; min-height: 18px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div id="avatar">🌱</div>
+    <div id="header-info">
+      <div id="bot-name">Habit Journal Bot</div>
+      <div id="bot-status"><span id="status-dot"></span> Active session</div>
+    </div>
+    <div id="progress-wrap">
+      <div id="progress-label">0 / 0</div>
+      <div id="progress-bar-track"><div id="progress-bar-fill" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div id="messages"></div>
+  <div id="typing" style="margin: 0 24px 8px;">
+    <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
+  </div>
+
+  <div id="summary-card">
+    <h3>📋 Session Summary — Ready to Sync</h3>
+    <div class="summary-grid" id="summary-grid"></div>
+    <button id="sync-btn">⬆ Sync to Google Sheets</button>
+    <div id="sync-status"></div>
+  </div>
+
+  <div id="input-area">
+    <textarea id="user-input" placeholder="Type your answer..." rows="1"></textarea>
+    <button id="send-btn" aria-label="Send">
+      <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+// =====================================================
+// CONFIGURATION — PASTE YOUR GOOGLE APPS SCRIPT URL HERE
+// =====================================================
+const SHEET_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE";
+
+// =====================================================
+// PREDEFINED QUESTIONS
+// Each question has: text, key (column name), type, options (optional)
+// =====================================================
+const QUESTIONS = [
+  {
+    text: "Good day! 👋 I'm your daily habit tracker. Let's check in. What time did you wake up today?",
+    key: "wakeUpTime",
+    type: "text",
+    placeholder: "e.g. 6:30 AM",
+    chips: ["5:30 AM", "6:00 AM", "6:30 AM", "7:00 AM", "7:30 AM", "8:00 AM+"]
+  },
+  {
+    text: "How many hours of sleep did you get last night?",
+    key: "sleepDuration",
+    type: "text",
+    placeholder: "e.g. 7 hours",
+    chips: ["< 5 hrs", "5–6 hrs", "6–7 hrs", "7–8 hrs", "8+ hrs"]
+  },
+  {
+    text: "Did you exercise today?",
+    key: "exerciseDone",
+    type: "choice",
+    chips: ["Yes ✅", "No ❌", "Light movement only"]
+  },
+  {
+    text: "What type of exercise did you do? (Skip if none)",
+    key: "exerciseType",
+    type: "text",
+    placeholder: "e.g. Running, Gym, Yoga",
+    chips: ["Running", "Gym", "Yoga", "Walk", "Cycling", "None"]
+  },
+  {
+    text: "How long did you exercise? (in minutes)",
+    key: "exerciseDuration",
+    type: "text",
+    placeholder: "e.g. 30 mins",
+    chips: ["15 min", "30 min", "45 min", "60 min", "90+ min", "None"]
+  },
+  {
+    text: "How many glasses of water did you drink today?",
+    key: "waterIntake",
+    type: "text",
+    placeholder: "e.g. 8",
+    chips: ["< 4", "4–6", "6–8", "8–10", "10+"]
+  },
+  {
+    text: "Were your meals healthy today?",
+    key: "mealsHealthy",
+    type: "choice",
+    chips: ["Mostly healthy ✅", "Mixed — could be better", "Not at all ❌"]
+  },
+  {
+    text: "How many hours of screen time (non-work) did you have?",
+    key: "screenTime",
+    type: "text",
+    placeholder: "e.g. 2 hrs",
+    chips: ["< 1 hr", "1–2 hrs", "2–3 hrs", "3–4 hrs", "4+ hrs"]
+  },
+  {
+    text: "How many productive hours did you have today?",
+    key: "productiveHours",
+    type: "text",
+    placeholder: "e.g. 5 hrs",
+    chips: ["< 2 hrs", "2–4 hrs", "4–6 hrs", "6–8 hrs", "8+ hrs"]
+  },
+  {
+    text: "How would you rate your mood today? (1 = terrible, 10 = excellent)",
+    key: "mood",
+    type: "rating",
+    chips: ["1","2","3","4","5","6","7","8","9","10"]
+  },
+  {
+    text: "How would you rate your energy levels today? (1 = drained, 10 = full of energy)",
+    key: "energyLevel",
+    type: "rating",
+    chips: ["1","2","3","4","5","6","7","8","9","10"]
+  },
+  {
+    text: "What was your top win or achievement today?",
+    key: "topWin",
+    type: "text",
+    placeholder: "e.g. Finished a chapter, hit the gym..."
+  },
+  {
+    text: "What was your biggest challenge or struggle today?",
+    key: "biggestChallenge",
+    type: "text",
+    placeholder: "e.g. Procrastinated on work..."
+  },
+  {
+    text: "Which habit did you successfully keep today?",
+    key: "habitKept",
+    type: "text",
+    placeholder: "e.g. Morning walk, reading, no junk food..."
+  },
+  {
+    text: "Which habit did you break or miss today?",
+    key: "habitBroken",
+    type: "text",
+    placeholder: "e.g. Skipped meditation, slept late..."
+  },
+  {
+    text: "Any final notes or observations about yourself today?",
+    key: "notes",
+    type: "text",
+    placeholder: "Free-form reflection..."
+  }
+];
+
+// =====================================================
+// STATE
+// =====================================================
+let currentQ = 0;
+let answers = {};
+let isTyping = false;
+
+const messagesEl = document.getElementById('messages');
+const inputEl = document.getElementById('user-input');
+const sendBtn = document.getElementById('send-btn');
+const typingEl = document.getElementById('typing');
+const summaryCard = document.getElementById('summary-card');
+const summaryGrid = document.getElementById('summary-grid');
+const syncBtn = document.getElementById('sync-btn');
+const syncStatus = document.getElementById('sync-status');
+const progressLabel = document.getElementById('progress-label');
+const progressFill = document.getElementById('progress-bar-fill');
+
+// =====================================================
+// HELPERS
+// =====================================================
+function getTime() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function scrollBottom() {
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function updateProgress() {
+  const pct = QUESTIONS.length > 0 ? Math.round((currentQ / QUESTIONS.length) * 100) : 0;
+  progressLabel.textContent = `${currentQ} / ${QUESTIONS.length}`;
+  progressFill.style.width = pct + '%';
+}
+
+function addMessage(text, role) {
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = text.replace(/\n/g, '<br>');
+  div.appendChild(bubble);
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta';
+  meta.textContent = getTime();
+  div.appendChild(meta);
+  messagesEl.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function addChips(options, onSelect) {
+  const div = document.createElement('div');
+  div.className = 'chips';
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.textContent = opt;
+    btn.onclick = () => onSelect(opt, div);
+    div.appendChild(btn);
+  });
+  messagesEl.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function showTyping(ms = 800) {
+  return new Promise(resolve => {
+    typingEl.style.display = 'flex';
+    scrollBottom();
+    setTimeout(() => {
+      typingEl.style.display = 'none';
+      resolve();
+    }, ms);
+  });
+}
+
+// =====================================================
+// CORE FLOW
+// =====================================================
+async function askQuestion(index) {
+  if (index >= QUESTIONS.length) {
+    await finishSession();
+    return;
+  }
+
+  const q = QUESTIONS[index];
+  await showTyping(600 + Math.random() * 400);
+  addMessage(q.text, 'bot');
+
+  if (q.chips) {
+    addChips(q.chips, (val, chipContainer) => {
+      chipContainer.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      chipContainer.querySelectorAll('.chip').forEach(c => {
+        if (c.textContent === val) c.classList.add('selected');
+      });
+      // Disable all chips after selection
+      setTimeout(() => {
+        chipContainer.querySelectorAll('.chip').forEach(c => c.disabled = true);
+        recordAnswer(val);
+      }, 200);
+    });
+  }
+
+  inputEl.focus();
+}
+
+function recordAnswer(val) {
+  const q = QUESTIONS[currentQ];
+  answers[q.key] = val;
+  addMessage(val, 'user');
+  currentQ++;
+  updateProgress();
+  askQuestion(currentQ);
+}
+
+async function finishSession() {
+  await showTyping(900);
+  addMessage("That's a wrap for today! 🎉 Here's your session summary. Hit <strong>Sync to Google Sheets</strong> to save it.", 'bot');
+
+  // Build summary
+  summaryGrid.innerHTML = '';
+  const labels = {
+    wakeUpTime: "Wake Up", sleepDuration: "Sleep", exerciseDone: "Exercised",
+    exerciseType: "Exercise Type", exerciseDuration: "Duration",
+    waterIntake: "Water (glasses)", mealsHealthy: "Meals",
+    screenTime: "Screen Time", productiveHours: "Productive Hrs",
+    mood: "Mood (1–10)", energyLevel: "Energy (1–10)",
+    topWin: "Top Win", biggestChallenge: "Biggest Challenge",
+    habitKept: "Habit Kept", habitBroken: "Habit Broken", notes: "Notes"
+  };
+  Object.entries(answers).forEach(([k, v]) => {
+    const item = document.createElement('div');
+    item.className = 'summary-item';
+    item.innerHTML = `<div class="s-label">${labels[k] || k}</div><div class="s-val">${v}</div>`;
+    summaryGrid.appendChild(item);
+  });
+
+  summaryCard.style.display = 'block';
+  inputEl.disabled = true;
+  sendBtn.disabled = true;
+  inputEl.placeholder = 'Session complete.';
+  scrollBottom();
+  updateProgress();
+}
+
+// =====================================================
+// SYNC TO GOOGLE SHEETS
+// =====================================================
+syncBtn.addEventListener('click', async () => {
+  if (SHEET_URL === "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE") {
+    syncStatus.style.color = '#f87171';
+    syncStatus.textContent = '⚠ Please set your SHEET_URL in the script first.';
+    return;
+  }
+
+  syncBtn.disabled = true;
+  syncBtn.textContent = 'Syncing...';
+  syncStatus.textContent = '';
+
+  const payload = {
+    ...answers,
+    date: new Date().toLocaleDateString(),
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  };
+
+  try {
+    await fetch(SHEET_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    syncBtn.textContent = '✅ Synced to Google Sheets!';
+    syncStatus.style.color = '#6ee7b7';
+    syncStatus.textContent = 'Data saved successfully. Check your Google Sheet.';
+  } catch (err) {
+    syncBtn.disabled = false;
+    syncBtn.textContent = '⬆ Retry Sync';
+    syncStatus.style.color = '#f87171';
+    syncStatus.textContent = 'Error: ' + err.message;
+  }
+});
+
+// =====================================================
+// INPUT HANDLING
+// =====================================================
+function handleSend() {
+  const val = inputEl.value.trim();
+  if (!val || currentQ >= QUESTIONS.length) return;
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  recordAnswer(val);
+}
+
+sendBtn.addEventListener('click', handleSend);
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+});
+inputEl.addEventListener('input', () => {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 110) + 'px';
+});
+
+// =====================================================
+// START
+// =====================================================
+updateProgress();
+askQuestion(0);
+</script>
+</body>
+</html>
